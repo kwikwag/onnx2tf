@@ -93,6 +93,8 @@ def make_node(
     strides = graph_node.attrs.get('strides', [1] * spatial_size)
     dilations = graph_node.attrs.get('dilations', [1] * spatial_size)
 
+    inputs_hint_as_image: bool = kwargs['inputs_hint_as_image']
+
     # Param replacement - OP replacement
     op_rep_params = kwargs.get('op_rep_params', [])
     output_shape_ = None
@@ -179,6 +181,7 @@ def make_node(
                     onnx_graph=onnx_graph,
                     output_names=[graph_node_output.name],
                     use_cuda=use_cuda,
+                    inputs_hint_as_image=inputs_hint_as_image,
                 )[0]
             onnx_output_shape = list(convtranspose_output.shape)
             tf_output_shape = []

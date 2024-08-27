@@ -77,6 +77,7 @@ def convert(
     not_use_opname_auto_generate: Optional[bool] = False,
     batch_size: Optional[int] = None,
     overwrite_input_shape: Optional[List[str]] = None,
+    inputs_hint_as_image: bool = False,
     no_large_tensor: Optional[bool] = False,
     output_nms_with_dynamic_tensor: Optional[bool] = False,
     keep_ncw_or_nchw_or_ncdhw_input_names: Optional[List[str]] = None,
@@ -248,6 +249,12 @@ def convert(
         A value of 1 or more must be specified.\n
         Numerical values other than dynamic dimensions are ignored.\n
         Ignores batch_size if specified at the same time as batch_size.
+
+    inputs_hint_as_image: Optional[bool]
+        When converting a model with 4D image input and undefined height and width sizes,\n
+        specifying this option slightly improves the conversion success probability.\n
+        This option does not fix the ONNX input geometry like “-ois” and\n
+        does not optimize the ONNX file for fixed resolution.
 
     no_large_tensor: Optional[bool]
         Suppresses constant bloat caused by Tile OP when optimizing models in onnxsim.\n
@@ -922,6 +929,7 @@ def convert(
         'relu_relu6_merge_op_names': {},
         'mul_div_replace_op_names': {},
         'use_cuda': use_cuda,
+        'inputs_hint_as_image': inputs_hint_as_image,
     }
 
     tf_layers_dict = {}
@@ -1041,6 +1049,7 @@ def convert(
                     tf_layers_dict=tf_layers_dict,
                     use_cuda=use_cuda,
                     disable_strict_mode=disable_strict_mode,
+                    inputs_hint_as_image=inputs_hint_as_image,
                 )
             """
             onnx_tensor_infos_for_validation:
@@ -1872,6 +1881,7 @@ def convert(
                         custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
                         tf_layers_dict=tf_layers_dict,
                         use_cuda=use_cuda,
+                        inputs_hint_as_image=inputs_hint_as_image,
                     )
             except Exception as ex:
                 warn(
@@ -2177,6 +2187,16 @@ def main():
             'A value of 1 or more must be specified. \n' +
             'Numerical values other than dynamic dimensions are ignored. \n' +
             'Ignores --batch_size if specified at the same time as --batch_size.'
+    )
+    parser.add_argument(
+        '-ihai',
+        '--inputs_hint_as_image',
+        action='store_true',
+        help=\
+            'When converting a model with 4D image input and undefined height and width sizes, \n'+
+            'specifying this option slightly improves the conversion success probability. \n'+
+            'This option does not fix the ONNX input geometry like “-ois” and \n'+
+            'does not optimize the ONNX file for fixed resolution.'
     )
     parser.add_argument(
         '-nlt',
@@ -2589,6 +2609,7 @@ def main():
         not_use_opname_auto_generate=args.not_use_opname_auto_generate,
         batch_size=args.batch_size,
         overwrite_input_shape=args.overwrite_input_shape,
+        inputs_hint_as_image=args.inputs_hint_as_image,
         no_large_tensor=args.no_large_tensor,
         output_nms_with_dynamic_tensor=args.output_nms_with_dynamic_tensor,
         keep_ncw_or_nchw_or_ncdhw_input_names=args.keep_ncw_or_nchw_or_ncdhw_input_names,

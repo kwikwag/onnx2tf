@@ -3622,6 +3622,7 @@ def dummy_onnx_inference(
     tf_layers_dict: Optional[Dict] = None,
     use_cuda: bool = False,
     disable_strict_mode: bool = False,
+    inputs_hint_as_image: bool = False,
 ) -> List[np.ndarray]:
     """Perform inference on ONNX subgraphs with an all-1 dummy tensor.
 
@@ -3649,6 +3650,9 @@ def dummy_onnx_inference(
 
     disable_strict_mode: Optional[bool]
         True to disable strict inference mode, False to enable it.
+
+    inputs_hint_as_image: Optional[bool]
+        Enable auto shape hints.
 
     Returns
     ----------
@@ -3774,12 +3778,25 @@ def dummy_onnx_inference(
                 and (dim is None or isinstance(dim, str)):
                 # Batch size assignment for input OPs
                 new_input_size.append(input_sizes[0][0])
-            elif dim is None or isinstance(dim, str):
+            elif (dim is None or isinstance(dim, str)) and not inputs_hint_as_image:
                 # Fixed and assigned 1
+                new_input_size.append(1)
+            elif (dim is None or isinstance(dim, str)) and idx == 0 and inputs_hint_as_image:
+                # Batch size fixed and assigned 1
                 new_input_size.append(1)
             else:
                 # Assign input shape as is
-                new_input_size.append(dim)
+                if not inputs_hint_as_image:
+                    new_input_size.append(dim)
+                else:
+                    if inputs_hint_as_image and idx == 1 and input_size is not None and not (dim is None or isinstance(dim, str)) and len(input_size) == 4:
+                        new_input_size.append(dim)
+                    elif inputs_hint_as_image and idx == 1 and input_size is not None and (dim is None or isinstance(dim, str)) and len(input_size) == 4:
+                        new_input_size.append(3)
+                    elif inputs_hint_as_image and idx == 2 and input_size is not None and (dim is None or isinstance(dim, str)) and len(input_size) == 4:
+                        new_input_size.append(256)
+                    elif inputs_hint_as_image and idx == 3 and input_size is not None and (dim is None or isinstance(dim, str)) and len(input_size) == 4:
+                        new_input_size.append(320)
         new_input_sizes.append(new_input_size)
     input_sizes = new_input_sizes
     input_dtypes: List[Any] = [inp.dtype for inp in onnx_inputs]
