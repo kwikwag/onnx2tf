@@ -77,6 +77,7 @@ def convert(
     not_use_opname_auto_generate: Optional[bool] = False,
     batch_size: Optional[int] = None,
     overwrite_input_shape: Optional[List[str]] = None,
+    inputs_shape_hint: Optional[List[str]] = None,
     no_large_tensor: Optional[bool] = False,
     output_nms_with_dynamic_tensor: Optional[bool] = False,
     keep_ncw_or_nchw_or_ncdhw_input_names: Optional[List[str]] = None,
@@ -248,6 +249,20 @@ def convert(
         A value of 1 or more must be specified.\n
         Numerical values other than dynamic dimensions are ignored.\n
         Ignores batch_size if specified at the same time as batch_size.
+
+    inputs_shape_hint: Optional[List[str]]
+        To improve the success rate of converting dynamic shaped input tensors,\n
+        This option works differently from the "-ois" option in that it does not optimize the model structure.\n
+        specify hints about the shape of the input data.\n
+        The format is\n
+        "input_name_1:dim0,...,dimN" "input_name_2:dim0,...,dimN" "input_name_3:dim0,...,dimN".\n
+        When there is only one input, for example,\n
+        "data:1,3,224,224"\n
+        When there are multiple inputs, for example,\n
+        "data1:1,3,224,224" "data2:1,3,112,112" "data3:5"\n
+        A value of 1 or more must be specified.\n
+        Numerical values other than dynamic dimensions are ignored.\n
+        Ignores --batch_size if specified at the same time as --batch_size.
 
     no_large_tensor: Optional[bool]
         Suppresses constant bloat caused by Tile OP when optimizing models in onnxsim.\n
@@ -516,6 +531,14 @@ def convert(
         )
         sys.exit(1)
 
+    # inputs_shape_hint
+    if inputs_shape_hint is not None \
+        and not isinstance(inputs_shape_hint, list):
+        error(
+            f'inputs_shape_hint must be specified by list.'
+        )
+        sys.exit(1)
+
     # determination of errors in custom input
     if custom_input_op_name_np_data_path is not None:
         for param in custom_input_op_name_np_data_path:
@@ -653,6 +676,13 @@ def convert(
             warn(
                 'Failed to optimize the onnx file.'
             )
+
+    # inputs_shape_hint
+    inputs_shape_hint_dict = {}
+    if inputs_shape_hint is not None:
+        for item in inputs_shape_hint:
+            key, value = item.split(":")
+            inputs_shape_hint_dict[key] = list(map(int, value.split(",")))
 
     # Automatic generation of each OP name - sng4onnx
     if not not_use_opname_auto_generate:
@@ -922,6 +952,7 @@ def convert(
         'relu_relu6_merge_op_names': {},
         'mul_div_replace_op_names': {},
         'use_cuda': use_cuda,
+        'inputs_shape_hint_dict': inputs_shape_hint_dict,
     }
 
     tf_layers_dict = {}
@@ -1041,6 +1072,7 @@ def convert(
                     tf_layers_dict=tf_layers_dict,
                     use_cuda=use_cuda,
                     disable_strict_mode=disable_strict_mode,
+                    inputs_shape_hint_dict=inputs_shape_hint_dict,
                 )
             """
             onnx_tensor_infos_for_validation:
@@ -1872,6 +1904,7 @@ def convert(
                         custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
                         tf_layers_dict=tf_layers_dict,
                         use_cuda=use_cuda,
+                        inputs_shape_hint_dict=inputs_shape_hint_dict,
                     )
             except Exception as ex:
                 warn(
@@ -1881,12 +1914,15 @@ def convert(
                 warn(f'{ex}')
             else:
                 # TF dummy inference
-                tf_tensor_infos: Dict[Any] = dummy_tf_inference(
-                    model=model,
-                    inputs=inputs,
-                    test_data_nhwc=test_data_nhwc,
-                    custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
-                )
+                a=0
+                tf_tensor_infos: Dict[Any] = \
+                    dummy_tf_inference(
+                        model=model,
+                        inputs=inputs,
+                        test_data_nhwc=test_data_nhwc,
+                        custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
+                        inputs_shape_hint_dict=inputs_shape_hint_dict,
+                    )
                 # Validation
                 onnx_tensor_infos = {
                     output_name: dummy_onnx_output \
@@ -2168,6 +2204,25 @@ def main():
         nargs='+',
         help=\
             'Overwrite the input shape. \n' +
+            'The format is\n' +
+            '"input_name_1:dim0,...,dimN" "input_name_2:dim0,...,dimN" "input_name_3:dim0,...,dimN". \n' +
+            'When there is only one input, for example, \n' +
+            '"data:1,3,224,224" \n' +
+            'When there are multiple inputs, for example, \n' +
+            '"data1:1,3,224,224" "data2:1,3,112,112" "data3:5" \n' +
+            'A value of 1 or more must be specified. \n' +
+            'Numerical values other than dynamic dimensions are ignored. \n' +
+            'Ignores --batch_size if specified at the same time as --batch_size.'
+    )
+    parser.add_argument(
+        '-ish',
+        '--inputs_shape_hint',
+        type=str,
+        nargs='+',
+        help=\
+            'To improve the success rate of converting dynamic shaped input tensors, \n' +
+            'This option works differently from the "-ois" option in that it does not optimize the model structure. \n' +
+            'specify hints about the shape of the input data. \n' +
             'The format is\n' +
             '"input_name_1:dim0,...,dimN" "input_name_2:dim0,...,dimN" "input_name_3:dim0,...,dimN". \n' +
             'When there is only one input, for example, \n' +
@@ -2589,6 +2644,7 @@ def main():
         not_use_opname_auto_generate=args.not_use_opname_auto_generate,
         batch_size=args.batch_size,
         overwrite_input_shape=args.overwrite_input_shape,
+        inputs_shape_hint=args.inputs_shape_hint,
         no_large_tensor=args.no_large_tensor,
         output_nms_with_dynamic_tensor=args.output_nms_with_dynamic_tensor,
         keep_ncw_or_nchw_or_ncdhw_input_names=args.keep_ncw_or_nchw_or_ncdhw_input_names,

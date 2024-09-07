@@ -179,6 +179,7 @@ def make_node(
                     onnx_graph=onnx_graph,
                     output_names=[graph_node_output.name],
                     use_cuda=use_cuda,
+                    inputs_shape_hint_dict=kwargs.get('inputs_shape_hint_dict', {}),
                 )[0]
             onnx_output_shape = list(convtranspose_output.shape)
             tf_output_shape = []

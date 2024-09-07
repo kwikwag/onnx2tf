@@ -3622,6 +3622,7 @@ def dummy_onnx_inference(
     tf_layers_dict: Optional[Dict] = None,
     use_cuda: bool = False,
     disable_strict_mode: bool = False,
+    inputs_shape_hint_dict: Dict[str, List[int]] = {},
 ) -> List[np.ndarray]:
     """Perform inference on ONNX subgraphs with an all-1 dummy tensor.
 
@@ -3649,6 +3650,9 @@ def dummy_onnx_inference(
 
     disable_strict_mode: Optional[bool]
         True to disable strict inference mode, False to enable it.
+
+    inputs_shape_hint_dict: Optional[Dict[List[int]]]
+        Shape hints.
 
     Returns
     ----------
@@ -3765,7 +3769,7 @@ def dummy_onnx_inference(
     input_names: List[str] = [inp.name for inp in onnx_inputs]
     input_sizes: List[int] = [inp.shape for inp in onnx_inputs]
     new_input_sizes = []
-    for input_size in input_sizes:
+    for input_name, input_size in zip(input_names, input_sizes):
         new_input_size = []
         for idx, dim in enumerate(input_size):
             if idx == 0 and input_sizes[0][0] is not None \
@@ -3774,12 +3778,17 @@ def dummy_onnx_inference(
                 and (dim is None or isinstance(dim, str)):
                 # Batch size assignment for input OPs
                 new_input_size.append(input_sizes[0][0])
-            elif dim is None or isinstance(dim, str):
+            elif dim is None or isinstance(dim, str) and not inputs_shape_hint_dict:
                 # Fixed and assigned 1
                 new_input_size.append(1)
             else:
                 # Assign input shape as is
-                new_input_size.append(dim)
+                if not inputs_shape_hint_dict:
+                    new_input_size.append(dim)
+                else:
+                    input_shape_hints = inputs_shape_hint_dict[input_name]
+                    input_shape_hint = input_shape_hints[idx]
+                    new_input_size.append(input_shape_hint)
         new_input_sizes.append(new_input_size)
     input_sizes = new_input_sizes
     input_dtypes: List[Any] = [inp.dtype for inp in onnx_inputs]
@@ -3875,6 +3884,7 @@ def dummy_tf_inference(
     test_data_nhwc: Optional[np.ndarray] = None,
     verification_datas: Optional[List[np.ndarray]] = None,
     custom_input_op_name_np_data_path: Optional[str] = None,
+    inputs_shape_hint_dict: Dict[str, List[int]] = {},
 ) -> Any:
     """Perform inference on TF subgraphs with an all-1 dummy tensor.
 
@@ -3895,6 +3905,9 @@ def dummy_tf_inference(
     custom_input_op_name_np_data_path
         Path to Numpy file for custom data used for dummy inference
 
+    inputs_shape_hint_dict: Optional[Dict[List[int]]]
+        Shape hints.
+
     Returns
     ----------
     outputs: Dict[np.ndarray]
@@ -3904,7 +3917,7 @@ def dummy_tf_inference(
     input_names: List[str] = [inp.name for inp in inputs]
     input_sizes: List[int] = [inp.shape for inp in inputs]
     new_input_sizes = []
-    for input_size in input_sizes:
+    for input_name, input_size in zip(input_names, input_sizes):
         new_input_size = []
         for idx, dim in enumerate(input_size):
             if idx == 0 and input_sizes[0][0] is not None \
@@ -3912,12 +3925,17 @@ def dummy_tf_inference(
                 and dim is None:
                 # Batch size assignment for input OPs
                 new_input_size.append(input_sizes[0][0])
-            elif dim is None:
+            elif dim is None and not inputs_shape_hint_dict:
                 # Fixed and assigned 1
                 new_input_size.append(1)
             else:
                 # Assign input shape as is
-                new_input_size.append(dim)
+                if not inputs_shape_hint_dict:
+                    new_input_size.append(dim)
+                else:
+                    input_shape_hints = inputs_shape_hint_dict[input_name]
+                    input_shape_hint = input_shape_hints[idx]
+                    new_input_size.append(input_shape_hint)
         new_input_sizes.append(new_input_size)
     input_sizes = new_input_sizes
     input_dtypes: List[Any] = [inp.dtype for inp in inputs]
@@ -5688,6 +5706,7 @@ def acquisition_of_validation_data(
             inputs=tf_model_inputs,
             test_data_nhwc=test_data_nhwc,
             custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
+            inputs_shape_hint_dict=kwargs.get('inputs_shape_hint_dict', {}),
         )
     except Exception as ex:
         pass

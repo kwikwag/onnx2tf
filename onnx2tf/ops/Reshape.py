@@ -371,6 +371,7 @@ def make_node(
                                 inputs=tf_model_inputs,
                                 test_data_nhwc=test_data_nhwc,
                                 custom_input_op_name_np_data_path=custom_input_op_name_np_data_path,
+                                inputs_shape_hint_dict=kwargs.get('inputs_shape_hint_dict', {}),
                             )
                     except Exception as ex:
                         pass
